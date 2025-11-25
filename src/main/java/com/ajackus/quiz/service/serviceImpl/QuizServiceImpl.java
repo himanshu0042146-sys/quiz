@@ -187,4 +187,21 @@ public class QuizServiceImpl implements QuizService {
 
         return resp;
     }
+
+
+    @Override
+    public void deleteById(Long id) {
+        Quiz quiz = quizRepo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Quiz not found with ID: " + id));
+
+        quizRepo.delete(quiz);
+    }
+
+    @Override
+    public void deleteByTitle(String title) {
+        Quiz quiz = quizRepo.findByTitle(title)
+                .orElseThrow(() -> new EntityNotFoundException("Quiz not found with title: " + title));
+
+        quizRepo.delete(quiz);
+    }
 }

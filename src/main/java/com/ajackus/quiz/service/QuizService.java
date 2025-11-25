@@ -17,4 +17,8 @@ public interface QuizService {
 
     EditQuizResponse editQuiz(Long quizId, EditQuizRequest request);
 
+    void deleteById(Long id);
+
+    void deleteByTitle(String title);
+
 }
