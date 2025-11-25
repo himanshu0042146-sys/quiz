@@ -1,6 +1,8 @@
 package com.ajackus.quiz.service.serviceImpl;
 
 import com.ajackus.quiz.model.request.CreateQuizRequest;
+import com.ajackus.quiz.model.request.EditQuizRequest;
+import com.ajackus.quiz.model.request.EditQuizResponse;
 import com.ajackus.quiz.model.request.SubmissionRequest;
 import com.ajackus.quiz.model.response.PublicQuizResponse;
 import com.ajackus.quiz.model.response.QuizResultResponse;
@@ -12,7 +14,14 @@ import com.ajackus.quiz.repository.OptionRepository;
 import com.ajackus.quiz.repository.QuestionRepository;
 import com.ajackus.quiz.repository.QuizRepository;
 import com.ajackus.quiz.service.QuizService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class QuizServiceImpl implements QuizService {
@@ -96,5 +105,86 @@ public class QuizServiceImpl implements QuizService {
         double score = (correctCount * 100.0) / result.getTotalQuestions();
         result.setScore(score);
         return result;
+    }
+
+    @Override
+    public EditQuizResponse editQuiz(Long quizId, EditQuizRequest request) {
+
+        Quiz quiz = quizRepo.findById(quizId)
+                .orElseThrow(() -> new EntityNotFoundException("Quiz not found: " + quizId));
+
+        // Update title
+        if (request.getTitle() != null) {
+            quiz.setTitle(request.getTitle());
+        }
+
+        // Map existing questions by id
+        Map<Long, Question> existingQuestions = quiz.getQuestions().stream()
+                .filter(q -> q.getId() != null)
+                .collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        List<Question> updatedQuestions = new ArrayList<>();
+
+        if (request.getQuestions() != null) {
+
+            for (EditQuizRequest.QuestionDto qdto : request.getQuestions()) {
+
+                Question question;
+                if (qdto.getId() != null && existingQuestions.containsKey(qdto.getId())) {
+
+                    // Update existing question
+                    question = existingQuestions.remove(qdto.getId());
+                    question.setText(qdto.getQuestionText());
+                    question.setType(QuestionType.valueOf(qdto.getType()));
+
+                    // Clear old options → recreate
+                    question.getOptions().clear();
+
+                } else {
+                    // New question
+                    question = new Question();
+                    question.setQuiz(quiz);
+                    question.setText(qdto.getQuestionText());
+                    question.setType(QuestionType.valueOf(qdto.getType()));
+                }
+
+                // Recreate options (since DTO has no option IDs)
+                List<Option> newOptions = new ArrayList<>();
+                if (qdto.getOptions() != null) {
+                    for (EditQuizRequest.OptionDto odto : qdto.getOptions()) {
+
+                        Option opt = new Option();
+                        opt.setOptionText(odto.getValue());
+                        opt.setCorrect(odto.isCorrect());
+                        opt.setQuestion(question);
+
+                        newOptions.add(opt);
+                    }
+                }
+
+                question.setOptions(newOptions);
+                updatedQuestions.add(question);
+            }
+        }
+
+        // Remove deleted questions
+        if (!existingQuestions.isEmpty()) {
+            for (Question removeQ : existingQuestions.values()) {
+                quiz.getQuestions().remove(removeQ);
+                // If orphanRemoval = true, no need to delete manually
+            }
+        }
+
+        // Replace with updated list
+        quiz.setQuestions(updatedQuestions);
+
+        Quiz saved = quizRepo.save(quiz);
+        // Build response
+        EditQuizResponse resp = new EditQuizResponse();
+        resp.setId(saved.getId());
+        resp.setTitle(saved.getTitle());
+        resp.setTotalQuestions(saved.getQuestions().size());
+
+        return resp;
     }
 }

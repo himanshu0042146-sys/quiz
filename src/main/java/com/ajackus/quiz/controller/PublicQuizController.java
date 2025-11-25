@@ -21,7 +21,7 @@ public class PublicQuizController {
     }
 
     @PostMapping("/{id}/submit")
-    public ResponseEntity<?> submitQuiz(@PathVariable Long id, @RequestBody SubmissionRequest s) {
-        return ResponseEntity.ok(quizService.submitQuiz(id, s));
+    public ResponseEntity<?> submitQuiz(@PathVariable Long id, @RequestBody SubmissionRequest submissionRequest) {
+        return ResponseEntity.ok(quizService.submitQuiz(id, submissionRequest));
     }
 }
